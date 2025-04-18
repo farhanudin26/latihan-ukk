@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 12px;
+        }
+        h2, h3 {
+            margin: 0;
+        }
+        .info {
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #000;
+        }
+        th {
+            background-color: #eee;
+        }
+        .total {
+            background-color: #f1f1f1;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .center {
+            text-align: center;
+        }
+        .thanks {
+            margin-top: 40px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h3>DiMart</h3>
+    <div class="info">
+        <p>Member Status : {{ 'Member' if sale.customer else 'Non Member' }}</p>
+        {% if sale.customer %}
+            <p>Nama Pelanggan : {{ sale.customer.name }}</p>
+            <p>No. HP : {{ sale.customer.no_hp }}</p>
+            <p>Poin Member : {{ sale.customer.point or 0 }}</p>
+        {% endif %}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nama Produk</th>
+                <th>QTY</th>
+                <th>Harga</th>
+                <th>Sub Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detail in sale.details %}
+            <tr>
+                <td>{{ detail.product.name }}</td>
+                <td class="center">{{ detail.quantity }}</td>
+                <td class="text-right">Rp {{ "{:,.0f}".format(detail.price) }}</td>
+                <td class="text-right">Rp {{ "{:,.0f}".format(detail.price * detail.quantity) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table>
+        <tr class="total">
+            <td colspan="3"><strong>Total Harga</strong></td>
+            <td class="text-right">Rp {{ "{:,.0f}".format(sale.total_price) }}</td>
+        </tr>
+        {% if sale.point_used %}
+        <tr class="total">
+            <td colspan="2">Poin Digunakan</td>
+            <td colspan="2" class="text-right">{{ sale.point_used }}</td>
+        </tr>
+        <tr class="total">
+            <td colspan="3"><strong>Harga Setelah Poin</strong></td>
+            <td class="text-right">Rp {{ "{:,.0f}".format(sale.total_price - sale.point_used) }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total">
+            <td colspan="3"><strong>Total Kembalian</strong></td>
+            <td class="text-right">Rp {{ "{:,.0f}".format(sale.change or 0) }}</td>
+        </tr>
+    </table>
+
+    <p class="center">{{ sale.sale_date.strftime('%Y-%m-%d') }} | {{ sale.user.name }}</p>
+
+    <p class="thanks">Terima kasih atas pembelian Anda!</p>
+</body>
+</html>

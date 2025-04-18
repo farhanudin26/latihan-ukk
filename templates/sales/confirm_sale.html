@@ -1,0 +1,177 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h2>Konfirmasi Penjualan</h2>
+
+<p><strong>Total Harga: Rp{{ "{:,.0f}".format(total_price).replace(",", ".") }}</strong></p>
+<p><strong>Poin Saat Ini: <span id="customer_points_display">0</span></strong></p>
+
+<!-- Menambahkan informasi harga saat ini -->
+<p><strong>Harga Saat Ini: Rp<span id="current_price_display">{{ "{:,.0f}".format(total_price).replace(",", ".") }}</span></strong></p>
+
+<form method="POST">
+    <div class="mb-3">
+        <label>Status Pelanggan</label>
+        <select name="customer_status" class="form-control" id="customer_status" onchange="toggleCustomerFields()" required>
+            <option value="member">Member</option>
+            <option value="non_member">Bukan Member</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Nama Pelanggan</label>
+        <input type="text" name="customer_name" id="customer_name" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+        <label>No HP</label>
+        <div class="input-group">
+            <input type="text" name="no_hp" id="no_hp" class="form-control" required>
+            <button type="button" class="btn btn-primary" onclick="checkPointsByPhone()">Cek Poin</button>
+        </div>
+    </div>
+
+    <div class="mb-3" id="points_section">
+        <label>Tambahkan Poin (10% dari total pembelian)</label>
+        <input type="number" name="customer_point" id="customer_point" class="form-control" value="0" readonly>
+    </div>
+
+    <div class="form-check mb-3" id="use_point_section">
+        <input type="checkbox" class="form-check-input" name="use_point" id="use_point" value="1" onchange="calculateReturn()">
+        <label class="form-check-label">Gunakan Poin (1 poin = Rp1)</label>
+    </div>
+
+    <div class="mb-3">
+        <label>Total Bayar</label>
+        <input type="number" name="total_pay" id="total_pay" class="form-control" required oninput="calculateReturn()">
+        <div class="text-danger" id="pay_warning" style="display: none;">Total bayar tidak boleh kurang dari total harga!</div>
+    </div>
+    
+    <div class="mb-3">
+        <label>Kembalian</label>
+        <input type="number" name="total_return" id="total_return" class="form-control" readonly required>
+    </div>    
+
+    <input type="hidden" name="point_used" id="point_used" value="0">
+
+    <button type="submit" class="btn btn-success">Simpan Penjualan</button>
+</form>
+
+<script>
+    let currentCustomerPoints = 0;
+    const totalPrice = '{{ total_price|int }}';
+
+    function toggleCustomerFields() {
+        const status = document.getElementById("customer_status").value;
+        const nameField = document.getElementById("customer_name");
+        const phoneField = document.getElementById("no_hp");
+        const pointField = document.getElementById("customer_point");
+        const usePointSection = document.getElementById("use_point_section");
+        const pointsSection = document.getElementById("points_section");
+
+        if (status === "non_member") {
+            nameField.value = "Customer";
+            phoneField.value = "-";
+            pointField.value = 0;
+            currentCustomerPoints = 0;
+            document.getElementById("customer_points_display").textContent = "0";
+
+            updateCurrentPrice();
+            calculateReturn();
+
+            // Sembunyikan bagian poin jika bukan member
+            pointsSection.style.display = "none";
+            usePointSection.style.display = "none";
+        } else {
+            nameField.value = "";
+            phoneField.value = "";
+
+            const defaultPoint = Math.floor(totalPrice * 0.1);
+            pointField.value = defaultPoint;
+            currentCustomerPoints = 0;
+            document.getElementById("customer_points_display").textContent = "0";
+
+            updateCurrentPrice();
+            calculateReturn();
+
+            // Tampilkan bagian poin jika member
+            pointsSection.style.display = "block";
+            usePointSection.style.display = "block";
+        }
+    }
+
+    function checkPointsByPhone() {
+        const phone = document.getElementById("no_hp").value;
+        if (phone) {
+            fetch(`/api/customer/points/${phone}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentCustomerPoints = data.points;
+                        document.getElementById("customer_points_display").textContent = currentCustomerPoints;
+                        updateCurrentPrice();
+                        calculateReturn();
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    alert("Error fetching points. Please try again.");
+                });
+        }
+    }
+
+    function updateCurrentPrice() {
+        const usePoints = document.getElementById("use_point").checked;
+        let priceAfterPoints = totalPrice;
+
+        if (usePoints) {
+            priceAfterPoints = totalPrice - currentCustomerPoints;
+            priceAfterPoints = priceAfterPoints < 0 ? 0 : priceAfterPoints;
+        }
+
+        document.getElementById("current_price_display").textContent = priceAfterPoints.toLocaleString('id-ID');
+    }
+
+    function calculateReturn() {
+        const usePoints = document.getElementById("use_point").checked;
+        let totalPay = parseInt(document.getElementById("total_pay").value) || 0;
+
+        let priceAfterPoints = totalPrice;
+        if (usePoints) {
+            priceAfterPoints -= currentCustomerPoints;
+            if (priceAfterPoints < 0) priceAfterPoints = 0;
+            document.getElementById("point_used").value = currentCustomerPoints;
+        } else {
+            document.getElementById("point_used").value = 0;
+        }
+
+        if (!usePoints) {
+            const pointsToAdd = Math.floor(totalPrice * 0.1);
+            document.getElementById("customer_point").value = pointsToAdd;
+        }
+
+        if (totalPay < priceAfterPoints) {
+            document.getElementById("pay_warning").style.display = "block";
+        } else {
+            document.getElementById("pay_warning").style.display = "none";
+        }
+
+        const totalReturn = totalPay - priceAfterPoints;
+        document.getElementById("total_return").value = totalReturn >= 0 ? totalReturn : 0;
+    }
+
+    function setDefaultPoints() {
+        const pointField = document.getElementById("customer_point");
+        const defaultPoint = Math.floor(totalPrice * 0.1);
+        pointField.value = defaultPoint;
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        setDefaultPoints();
+        calculateReturn();
+        toggleCustomerFields();
+        document.getElementById("customer_points_display").textContent = "0";
+    });
+</script>
+{% endblock %}

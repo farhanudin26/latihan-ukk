@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h2>Tambah Penjualan</h2>
+<form method="POST">
+<!-- Tanggal Penjualan (readonly) -->
+<div class="mb-3">
+    <label for="sale_date" class="form-label">Tanggal Penjualan</label>
+    <input type="date" class="form-control" name="sale_date" value="{{ today }}" readonly required>
+</div>
+
+
+    <h4>Pilih Produk</h4>
+    <div class="row" id="product-cards">
+        {% for product in products %}
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <img src="{{ url_for('static', filename='uploads/products/' ~ product.image) }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                <div class="card-body">
+                    <h5 class="card-title">{{ product.name }}</h5>
+                    <p class="card-text mb-1">Stok: {{ product.stock }}</p>
+                    <p class="card-text mb-2">Harga: Rp{{ "{:,.0f}".format(product.price).replace(",", ".") }}</p>
+                    <div class="form-check">
+                        <input type="checkbox" name="products[]" value="{{ product.id }}" class="form-check-input product-checkbox" data-price="{{ product.price }}" onchange="toggleQuantity(this, '{{ product.id }}')">
+                        <label class="form-check-label">Pilih</label>
+                    </div>
+                    <input type="number" name="quantities_{{ product.id }}" id="quantity_{{ product.id }}" class="form-control mt-2" placeholder="Jumlah" min="1" oninput="calculateTotal()" style="display:none;">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        <label>Total Harga</label>
+        <input type="number" name="total_price" id="total_price" class="form-control" readonly required>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Lanjut Konfirmasi</button>
+</form>
+
+<script>
+function toggleQuantity(checkbox, productId) {
+    const quantityInput = document.getElementById('quantity_' + productId);
+    quantityInput.style.display = checkbox.checked ? 'block' : 'none';
+    if (!checkbox.checked) {
+        quantityInput.value = '';
+    }
+    calculateTotal();
+}
+
+function calculateTotal() {
+    let total = 0;
+    const checkboxes = document.querySelectorAll('.product-checkbox');
+    checkboxes.forEach(checkbox => {
+        const productId = checkbox.value;
+        const price = parseFloat(checkbox.dataset.price);
+        const quantityInput = document.getElementById('quantity_' + productId);
+        
+        if (checkbox.checked && quantityInput && quantityInput.value) {
+            const qty = parseInt(quantityInput.value);
+            if (!isNaN(qty) && qty > 0) {
+                total += price * qty;
+            }
+        }
+    });
+    
+    document.getElementById('total_price').value = total;
+}
+</script>
+
+{% endblock %}

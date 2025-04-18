@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Kasir Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        .charts-container {
+            display: flex;
+            gap: 50px;
+            justify-content: center;
+            margin-top: 50px;
+        }
+        .chart-wrapper {
+            width: 500px;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="side-bar">
+        <!-- Logo di atas Sidebar -->
+        <div class="sidebar-logo">
+            <i class="fas fa-cash-register"></i>
+            <span class="logo-text">Kasir Web</span>
+        </div>
+        
+        <ul>
+            <li><a href="{{ url_for('dashboard') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li><a href="{{ url_for('api_bp.products') }}"><i class="fas fa-box"></i> Products</a></li>
+            <li><a href="{{ url_for('api_bp.list_sales') }}"><i class="fas fa-shopping-cart"></i> Sales</a></li>            
+            {% if current_user.role == 'admin' %}
+                <li><a href="{{ url_for('api_bp.users') }}"><i class="fas fa-users"></i> Users</a></li>
+            {% endif %}
+            <li><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="dashboard-container">
+        <h2>Welcome, {{ current_user.name }}</h2>
+
+        <!-- Conditional content based on user role -->
+        {% if current_user.role == 'admin' %}
+            <p>Welcome Admin! You have full access to manage users and products.</p>
+
+            <!-- Display charts here -->
+            <div class="charts-container">
+                <div class="chart-wrapper">
+                    <canvas id="barChart"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+
+        {% elif current_user.role == 'employee' %}
+            <div class="employee-info">
+                <h3>Selamat datang, Kasir!</h3>
+                <p class="date-today">Tanggal hari ini: {{ current_date }}</p>
+
+                <h3>Daftar Produk:</h3>
+                <table class="employee-products">
+                    <thead>
+                        <tr>
+                            <th>Nama Produk</th>
+                            <th>Harga</th>
+                            <th>Stok</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>{{ product.name }}</td>
+                            <td>Rp {{ "{:,.0f}".format(product.price) }}</td>
+                            <td>{{ product.stock }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if current_user.role == 'admin' %}
+    <script>
+        // Function to calculate date range (3 days before and 3 days after)
+        function getDateRange() {
+            const today = new Date();
+            const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            let dateRange = [];
+            for (let i = -3; i <= 3; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                const weekday = weekdays[date.getDay()];  // Get the weekday name
+                dateRange.push(`${weekday}, ${day}-${month}-${year}`);
+            }
+            return dateRange;
+        }
+
+        // Example data for products (replace this with dynamic data from server)
+        const productData = [
+            { name: 'Product A', sales: 30 },
+            { name: 'Product B', sales: 50 },
+            { name: 'Product C', sales: 70 },
+            { name: 'Product D', sales: 40 },
+        ];
+
+        // Extract labels (product names) and data (sales counts)
+        const productLabels = productData.map(product => product.name);
+        const productSales = productData.map(product => product.sales);
+
+        // Bar Chart
+        var ctxBar = document.getElementById('barChart').getContext('2d');
+        var barChart = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: getDateRange(), // Dynamic dates with weekdays
+                datasets: [{
+                    label: 'Sales Data',
+                    data: [12, 19, 3, 5, 2, 4, 6], // Example data, replace with dynamic sales data
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)', // Soft blue color
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    hoverBackgroundColor: 'rgba(54, 162, 235, 0.8)', // Hover effect
+                    hoverBorderColor: 'rgba(54, 162, 235, 1)',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)' // Soft grid lines
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)' // Soft grid lines
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        enabled: true,
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff'
+                    },
+                    legend: {
+                        display: false // Hide legend for this chart
+                    }
+                }
+            }
+        });
+
+        // Pie Chart
+        var ctxPie = document.getElementById('pieChart').getContext('2d');
+        var pieChart = new Chart(ctxPie, {
+            type: 'pie',
+            data: {
+                labels: productLabels, // Product names
+                datasets: [{
+                    data: productSales, // Product sales data
+                    backgroundColor: ['#FF6347', '#4682B4', '#FFD700', '#32CD32'], // Colors for each product
+                    hoverBackgroundColor: ['#FF4500', '#5A9BD5', '#FFCC00', '#228B22'], // Hover effect
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff'
+                    },
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            fontColor: '#333'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: DejaVu Sans, sans-serif; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #000;
+            font-size: 12px;
+        }
+        th {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h2>Data Penjualan</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nama Pelanggan</th>
+                <th>Tanggal Penjualan</th>
+                <th>Total Harga</th>
+                <th>Total Bayar</th>
+                <th>Kasir</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.customer.name or 'Customer' }}</td>
+                <td>{{ sale.sale_date.strftime('%Y-%m-%d') }}</td>
+                <td>Rp {{ "{:,.0f}".format(sale.total_price) }}</td>
+                <td>Rp {{ "{:,.0f}".format(sale.total_pay) }}</td>
+                <td>{{ sale.user.name }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

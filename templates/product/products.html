@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produk - Kasir Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="side-bar">
+        <!-- Logo di atas Sidebar -->
+        <div class="sidebar-logo">
+            <i class="fas fa-cash-register"></i>
+            <span class="logo-text">Kasir Web</span>
+        </div>
+        
+        <ul>
+            <li><a href="{{ url_for('dashboard') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li><a href="{{ url_for('api_bp.products') }}"><i class="fas fa-box"></i> Products</a></li>
+            <li><a href="{{ url_for('api_bp.list_sales') }}"><i class="fas fa-shopping-cart"></i> Sales</a></li>            
+            {% if current_user.role == 'admin' %}
+                <li><a href="{{ url_for('api_bp.users') }}"><i class="fas fa-users"></i> Users</a></li>
+            {% endif %}
+            <li><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="container mt-5">
+            <h2 class="mb-4">Daftar Produk</h2>
+
+            {% if current_user.role != 'employee' %}
+            <a href="{{ url_for('api_bp.add_product') }}" class="btn btn-primary mb-3">+ Tambah Produk</a>
+            {% endif %}
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nama Produk</th>
+                            <th>Harga</th>
+                            <th>Stok</th>
+                            <th>Gambar</th>
+                            {% if current_user.role != 'employee' %}
+                            <th>Opsi</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>{{ product.name }}</td>
+                            <td>Rp{{ "{:,.0f}".format(product.price) }}</td>
+                            <td>{{ product.stock }}</td>
+                            <td>
+                                {% if product.image %}
+                                <img src="{{ url_for('static', filename='uploads/products/' ~ product.image) }}" alt="{{ product.name }}" width="80" class="img-fluid">
+                                {% else %}
+                                <span class="text-muted">Tidak ada gambar</span>
+                                {% endif %}
+                            </td>
+                            {% if current_user.role != 'employee' %}
+                            <td>
+                                <a href="{{ url_for('api_bp.edit_product', id=product.id) }}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a href="{{ url_for('api_bp.update_product_stock', id=product.id) }}" class="btn btn-sm btn-info text-white">
+                                    <i class="fas fa-boxes"></i> Stok
+                                </a>
+                                <!-- Form untuk hapus produk -->
+                                <form action="{{ url_for('api_bp.delete_product', id=product.id) }}" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Yakin ingin menghapus produk ini?')">
+                                        <i class="fas fa-trash-alt"></i> Hapus
+                                    </button>
+                                </form>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
