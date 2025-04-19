@@ -1,3 +1,4 @@
+from datetime import datetime
 from . import db 
 from flask_login import UserMixin
 
@@ -19,6 +20,7 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, nullable=False)
     image = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     detail_sales = db.relationship('DetailSale', back_populates='product', lazy=True)
 
@@ -28,6 +30,7 @@ class Customer(db.Model):
     name = db.Column(db.String(100), nullable=False)
     no_hp = db.Column(db.String(20), nullable=False)
     point = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     sales = db.relationship('Sale', back_populates='customer', lazy=True)
 

@@ -6,6 +6,7 @@ from config import Config
 from models import db  # Import hanya db
 from babel.numbers import format_currency
 from datetime import date
+from flask_migrate import Migrate
 
 # Inisialisasi Flask
 app = Flask(__name__)
@@ -13,6 +14,7 @@ app.config.from_object(Config)
 
 # Inisialisasi extensions
 db.init_app(app)
+migrate = Migrate(app, db) #migrate 
 bcrypt = Bcrypt(app)
 
 # Session

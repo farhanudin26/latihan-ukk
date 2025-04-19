@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<head>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/invoice.css') }}">
+</head>
+
+<div class="container mt-4">
+    <nav class="mb-3">
+        <a href="{{ url_for('api_bp.sales') }}">← Kembali ke Daftar Penjualan</a>
+    </nav>
+    <h2 class="fw-bold">Print Invoice</h2>
+
+    <div class="bg-light p-4 rounded mt-3">
+        <div class="d-flex justify-content-between mb-3">
+            <div>
+                {% if customer %}
+                    <div><strong>No HP : {{ customer.no_hp }}</strong></div>
+                    <div>MEMBER SEJAK: {{ customer.created_at.strftime('%d %B %Y') if customer.created_at else '-' }}</div>
+                    <div>MEMBER POIN: {{ customer.point or 0 }}</div>
+                {% else %}
+                    <div><strong>Non Member</strong></div>
+                {% endif %}
+            </div>
+            <div class="text-end">
+                <div><strong>Invoice - #{{ sale.id }}</strong></div>
+                <div>{{ sale.sale_date.strftime('%d %B %Y') }}</div>
+            </div>
+        </div>
+
+        <table class="table table-bordered mt-3">
+            <thead class="table-light">
+                <tr>
+                    <th>Produk</th>
+                    <th>Harga</th>
+                    <th>Jumlah</th>
+                    <th>Sub Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in details %}
+                <tr>
+                    <td>{{ d.product.name }}</td>
+                    <td>Rp. {{ "{:,.0f}".format(d.product.price).replace(',', '.') }}</td>
+                    <td>{{ d.amount }}</td>
+                    <td>Rp. {{ "{:,.0f}".format(d.subtotal).replace(',', '.') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="row mt-4">
+            <div class="col-md-8">
+                <div class="bg-body-secondary p-3 rounded">
+                    <p>POIN DIGUNAKAN: {{ sale.point or 0 }}</p>
+                    <p>KASIR: {{ cashier.username if cashier and cashier.username else '-' }}</p>
+                    <p>KEMBALIAN: Rp. {{ "{:,.0f}".format(sale.total_return or 0).replace(',', '.') }}</p>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="bg-dark text-white p-3 rounded text-nowrap">
+                    <h5 class="m-0">TOTAL</h5>
+                    <h2 class="m-0">Rp. {{ "{:,.0f}".format(sale.total_price or 0).replace(',', '.') }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <a href="{{ url_for('api_bp.sales_invoice_pdf', sale_id=sale.id) }}" class="btn btn-primary">Unduh PDF</a>
+            <a href="{{ url_for('api_bp.sales') }}" class="btn btn-success">Selesai</a>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}

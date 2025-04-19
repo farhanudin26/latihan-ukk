@@ -3,7 +3,7 @@ from io import BytesIO
 import io
 import os
 from flask_bcrypt import Bcrypt  # Mengimpor bcrypt dari flask_bcrypt
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
+from flask import Blueprint, current_app, flash, jsonify, make_response, redirect, render_template, request, send_file, session, url_for
 from flask_login import current_user, login_required
 import pandas as pd
 from models.models import User, Product, Customer, Sale, DetailSale  # Model yang digunakan
@@ -246,11 +246,40 @@ def delete_product(id):
 ################# sale ####################
 
 # Tampilkan daftar penjualan
-@api_bp.route('/sales')
+@api_bp.route('/sales', endpoint='sales')
 @login_required
-def list_sales():
+def sales():
     sales = Sale.query.order_by(Sale.sale_date.desc()).all()
     return render_template('sales/sales.html', sales=sales)
+
+@api_bp.route('/api/sale', methods=['POST'])
+def create_sale():
+    customer_phone = request.form['no_hp']
+    points_used = int(request.form['points_used'])
+
+    # Dapatkan data pelanggan berdasarkan nomor HP
+    customer = Customer.query.filter_by(phone=customer_phone).first()
+
+    if customer:
+        if customer.points < points_used:
+            return jsonify({'success': False, 'message': 'Poin tidak cukup'}), 400
+
+        # Kurangi poin pelanggan
+        customer.points -= points_used
+        db.session.commit()
+
+        # Simpan data penjualan
+        sale = Sale(
+            customer_id=customer.id,
+            total_price=request.form['total_pay'],
+            points_used=points_used
+        )
+        db.session.add(sale)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Penjualan berhasil'}), 200
+
+    return jsonify({'success': False, 'message': 'Pelanggan tidak ditemukan'}), 404
 
 @api_bp.route('/sales/add', methods=['GET', 'POST'], endpoint='add_sale')
 @login_required
@@ -286,35 +315,6 @@ def add_sale():
     products = Product.query.all()
     today = date.today().isoformat()
     return render_template('sales/add_sale.html', products=products, today=today)
-
-@api_bp.route('/api/sale', methods=['POST'])
-def create_sale():
-    customer_phone = request.form['no_hp']
-    points_used = int(request.form['points_used'])
-
-    # Dapatkan data pelanggan berdasarkan nomor HP
-    customer = Customer.query.filter_by(phone=customer_phone).first()
-
-    if customer:
-        if customer.points < points_used:
-            return jsonify({'success': False, 'message': 'Poin tidak cukup'}), 400
-
-        # Kurangi poin pelanggan
-        customer.points -= points_used
-        db.session.commit()
-
-        # Simpan data penjualan
-        sale = Sale(
-            customer_id=customer.id,
-            total_price=request.form['total_pay'],
-            points_used=points_used
-        )
-        db.session.add(sale)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Penjualan berhasil'}), 200
-
-    return jsonify({'success': False, 'message': 'Pelanggan tidak ditemukan'}), 404
 
 @api_bp.route('/sales/confirm', methods=['GET', 'POST'], endpoint='confirm_sale')
 @login_required
@@ -391,9 +391,19 @@ def confirm_sale():
 
         session.pop('sale_data', None)
         flash("Penjualan berhasil disimpan.", "success")
-        return redirect(url_for('api_bp.list_sales'))
+        return redirect(url_for('api_bp.sales_invoice', sale_id=sale.id))
 
     return render_template('sales/confirm_sale.html', products=products, total_price=sale_data['total_price'])
+
+@api_bp.route('/sales/invoice/<int:sale_id>', methods=['GET'], endpoint='sales_invoice')
+@login_required
+def sales_invoice(sale_id):
+    sale = Sale.query.get_or_404(sale_id)
+    customer = Customer.query.get(sale.customer_id) if sale.customer_id else None
+    cashier = User.query.get(sale.user_id)
+    details = DetailSale.query.filter_by(sale_id=sale_id).all()
+
+    return render_template('sales/sales_invoice.html', sale=sale, customer=customer, cashier=cashier, details=details,)
 
 @api_bp.route('/sales/complete', methods=['POST'])
 def complete_sale():
@@ -450,20 +460,36 @@ def export_sales_excel():
 
     return send_file(output, download_name="data_penjualan.xlsx", as_attachment=True)
 
-@api_bp.route('/sales/<int:sale_id>/export_pdf')
-def export_sales_pdf(sale_id):
-    sale = Sale.query.filter_by(id=sale_id).first_or_404()
+@api_bp.route('/sales/invoice/pdf/<int:sale_id>')
+def sales_invoice_pdf(sale_id):
+    # Ambil data penjualan dan detail dari database
+    sale = Sale.query.get_or_404(sale_id)
+    customer = Customer.query.get(sale.customer_id) if sale.customer_id else None
+    cashier = User.query.get(sale.user_id)
+    details = DetailSale.query.filter_by(sale_id=sale_id).all()
 
-    html = render_template('sales/sale_invoice_pdf.html', sale=sale)
-    
-    # Generate PDF dengan xhtml2pdf
-    from xhtml2pdf import pisa
-    pdf_file = io.BytesIO()
-    pisa.CreatePDF(io.StringIO(html), dest=pdf_file)
-    pdf_file.seek(0)
+    # Render HTML untuk PDF
+    rendered = render_template('sales/sales_invoice_pdf.html', sale=sale, customer=customer, cashier=cashier, details=details)
 
-    return send_file(pdf_file, download_name=f"invoice_sale_{sale.id}.pdf", as_attachment=True)
+    # Buat buffer untuk menampung PDF
+    pdf_buffer = BytesIO()
 
+    # Generate PDF dari HTML menggunakan xhtml2pdf
+    pisa_status = pisa.CreatePDF(rendered, dest=pdf_buffer)
+
+    # Pastikan tidak ada error saat pembuatan PDF
+    if pisa_status.err:
+        return "Terjadi kesalahan saat membuat PDF", 500
+
+    # Kembali ke awal buffer
+    pdf_buffer.seek(0)
+
+    # Buat response dengan PDF
+    response = make_response(pdf_buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="invoice_{sale.id}.pdf"'
+
+    return response
 
 @api_bp.route('/sales/export_all_pdf')
 def export_all_sales_pdf():

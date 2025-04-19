@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice #{{ sale.id }}</title>
+    <style>
+            body {
+                font-family: DejaVu Sans, sans-serif;
+                font-size: 12px;
+            }
+            h2, h3 {
+                margin: 0;
+            }
+            .info {
+                margin-bottom: 20px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+            }
+            th, td {
+                padding: 8px;
+                border: 1px solid #000;
+            }
+            th {
+                background-color: #eee;
+            }
+            .total {
+                background-color: #f1f1f1;
+            }
+            .text-right {
+                text-align: right;
+            }
+            .center {
+                text-align: center;
+            }
+            .thanks {
+                margin-top: 40px;
+                text-align: center;
+                font-weight: bold;
+            }
+        </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>TOKO KASIRKU</h1>
+        <p>Jl. Mawar No. 123, Bogor | Telp: 0812-3456-7890</p>
+    </div>
+
+    <h2>INVOICE PENJUALAN</h2>
+
+    <div class="info">
+        <p>Member Status : {{ 'Member' if sale.customer else 'Non Member' }}</p>
+        <div><strong>No Invoice:</strong> #{{ sale.id }}</div>
+        <div><strong>Tanggal:</strong> {{ sale.sale_date.strftime('%d %B %Y') }}</div>
+        <div><strong>Kasir:</strong> {{ sale.user.name if sale.user and sale.user.name else '-' }}</div>
+        {% if customer %}
+            <div><strong>Member:</strong> {{ customer.no_hp }}</div>
+            <p>Nama Pelanggan : {{ sale.customer.name }}</p>
+            <div><strong>Poin Tersisa:</strong> {{ customer.point or 0 }}</div>
+            <div><strong>Member Sejak:</strong> {{ customer.created_at.strftime('%d %B %Y') if customer.created_at else '-' }}</div>
+        {% else %}
+            <div><strong>Pelanggan:</strong> Non Member</div>
+        {% endif %}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Produk</th>
+                <th>Harga</th>
+                <th>Jumlah</th>
+                <th>Sub Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in details %}
+            <tr>
+                <td>{{ d.product.name }}</td>
+                <td>Rp {{ "{:,.0f}".format(d.product.price).replace(',', '.') }}</td>
+                <td>{{ d.amount }}</td>
+                <td>Rp {{ "{:,.0f}".format(d.subtotal).replace(',', '.') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total-box">
+        <div><strong>Poin Digunakan:</strong> {{ sale.point or 0 }}</div>
+        <div><strong>Kembalian:</strong> Rp {{ "{:,.0f}".format(sale.total_return or 0).replace(',', '.') }}</div>
+        <div class="grand-total">TOTAL BAYAR: Rp {{ "{:,.0f}".format(sale.total_price or 0).replace(',', '.') }}</div>
+    </div>
+
+</body>
+</html>
