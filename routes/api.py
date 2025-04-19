@@ -17,19 +17,6 @@ bcrypt = Bcrypt()
 
 api_bp = Blueprint("api_bp", __name__)
 
-@api_bp.route('/customer/points/<string:phone>', methods=['GET'])
-def get_customer_points(phone):
-    customer = Customer.query.filter_by(no_hp=phone).first()
-    if customer:
-        return jsonify({
-            'success': True,
-            'points': customer.point
-        })
-    else:
-        return jsonify({
-            'success': False,
-            'message': 'Customer not found'
-        }), 404
 
 @api_bp.route("/api/sales_per_day")
 def get_sales_per_day():
@@ -358,8 +345,11 @@ def confirm_sale():
         final_point = 0
         if is_member and use_point and customer and customer.point > 0:
             final_point = min(customer.point, customer_point)
-            customer.point -= final_point
+            
+            # Pastikan semua poin terpakai dan diset ke 0
+            customer.point = 0
             db.session.commit()
+
 
         sale = Sale(
             sale_date=datetime.strptime(sale_data['sale_date'], '%Y-%m-%d'),
@@ -395,6 +385,20 @@ def confirm_sale():
 
     return render_template('sales/confirm_sale.html', products=products, total_price=sale_data['total_price'])
 
+@api_bp.route('/customer/points/<string:phone>', methods=['GET'])
+def get_customer_points(phone):
+    customer = Customer.query.filter_by(no_hp=phone).first()
+    if customer:
+        return jsonify({
+            'success': True,
+            'points': customer.point
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Customer not found'
+        }), 404
+        
 @api_bp.route('/sales/invoice/<int:sale_id>', methods=['GET'], endpoint='sales_invoice')
 @login_required
 def sales_invoice(sale_id):
@@ -462,26 +466,20 @@ def export_sales_excel():
 
 @api_bp.route('/sales/invoice/pdf/<int:sale_id>')
 def sales_invoice_pdf(sale_id):
-    # Ambil data penjualan dan detail dari database
     sale = Sale.query.get_or_404(sale_id)
     customer = Customer.query.get(sale.customer_id) if sale.customer_id else None
     cashier = User.query.get(sale.user_id)
     details = DetailSale.query.filter_by(sale_id=sale_id).all()
 
-    # Render HTML untuk PDF
     rendered = render_template('sales/sales_invoice_pdf.html', sale=sale, customer=customer, cashier=cashier, details=details)
 
-    # Buat buffer untuk menampung PDF
     pdf_buffer = BytesIO()
 
-    # Generate PDF dari HTML menggunakan xhtml2pdf
     pisa_status = pisa.CreatePDF(rendered, dest=pdf_buffer)
 
-    # Pastikan tidak ada error saat pembuatan PDF
     if pisa_status.err:
         return "Terjadi kesalahan saat membuat PDF", 500
 
-    # Kembali ke awal buffer
     pdf_buffer.seek(0)
 
     # Buat response dengan PDF
