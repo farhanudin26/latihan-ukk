@@ -37,14 +37,25 @@
                     <th>Sub Total</th>
                 </tr>
             </thead>
+            {% set point_used = sale.point or 0 %}
+            {% set remaining_point = point_used %}
             <tbody>
                 {% for d in details %}
-                <tr>
-                    <td>{{ d.product.name }}</td>
-                    <td>Rp. {{ "{:,.0f}".format(d.product.price).replace(',', '.') }}</td>
-                    <td>{{ d.amount }}</td>
-                    <td>Rp. {{ "{:,.0f}".format(d.subtotal).replace(',', '.') }}</td>
-                </tr>
+                    {% set item_price = d.product.price %}
+                    {% set subtotal = item_price * d.amount %}
+                    {% if loop.first and remaining_point > 0 %}
+                        {% set adjusted_subtotal = subtotal - remaining_point %}
+                        {% set adjusted_subtotal = adjusted_subtotal if adjusted_subtotal > 0 else 0 %}
+                        {% set remaining_point = 0 %}
+                    {% else %}
+                        {% set adjusted_subtotal = subtotal %}
+                    {% endif %}
+                    <tr>
+                        <td>{{ d.product.name }}</td>
+                        <td>Rp. {{ "{:,.0f}".format(item_price).replace(',', '.') }}</td>
+                        <td>{{ d.amount }}</td>
+                        <td>Rp. {{ "{:,.0f}".format(adjusted_subtotal).replace(',', '.') }}</td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -53,23 +64,23 @@
             <div class="col-md-8">
                 <div class="bg-body-secondary p-3 rounded">
                     <p>POIN DIGUNAKAN: {{ sale.point or 0 }}</p>
-                    <p>KASIR: {{ cashier.username if cashier and cashier.username else '-' }}</p>
+                    <div><strong>Kasir:</strong> {{ sale.user.name if sale.user and sale.user.name else '-' }}</div>
+                    <p><strong>Total Dibayar:</strong> Rp. {{ "{:,.0f}".format(sale.total_pay or 0).replace(',', '.') }}</p>
                     <p>KEMBALIAN: Rp. {{ "{:,.0f}".format(sale.total_return or 0).replace(',', '.') }}</p>
                 </div>
             </div>
             <div class="col-md-4 text-end">
                 <div class="bg-dark text-white p-3 rounded text-nowrap">
                     <h5 class="m-0">TOTAL</h5>
-                    <h2 class="m-0">Rp. {{ "{:,.0f}".format(sale.total_price or 0).replace(',', '.') }}</h2>
+                    <h2 class="m-0">Rp. {{ "{:,.0f}".format((sale.total_price or 0) - (sale.point or 0)).replace(',', '.') }}</h2>
                 </div>
             </div>
+            
         </div>
-
         <div class="mt-4 d-flex gap-2">
             <a href="{{ url_for('api_bp.sales_invoice_pdf', sale_id=sale.id) }}" class="btn btn-primary">Unduh PDF</a>
             <a href="{{ url_for('api_bp.sales') }}" class="btn btn-success">Selesai</a>
         </div>
-        
     </div>
 </div>
 {% endblock %}

@@ -46,7 +46,7 @@
 
     <div class="header">
         <h1>TOKO KASIRKU</h1>
-        <p>Jl. Mawar No. 123, Bogor | Telp: 0812-3456-7890</p>
+        <p>Jl. Raya Wangun Kelurahan Sindangsari Bogor Timur | Telp: 0831-9263-0720</p>
     </div>
 
     <h2>INVOICE PENJUALAN</h2>
@@ -89,8 +89,9 @@
 
     <div class="total-box">
         <div><strong>Poin Digunakan:</strong> {{ sale.point or 0 }}</div>
+        <div><strong>Total harga :</strong>                    <h2 class="m-0">Rp. {{ "{:,.0f}".format((sale.total_price or 0) - (sale.point or 0)).replace(',', '.') }}</h2></div>
+        <p><strong>Total Dibayar:</strong> Rp. {{ "{:,.0f}".format(sale.total_pay or 0).replace(',', '.') }}</p>
         <div><strong>Kembalian:</strong> Rp {{ "{:,.0f}".format(sale.total_return or 0).replace(',', '.') }}</div>
-        <div class="grand-total">TOTAL BAYAR: Rp {{ "{:,.0f}".format(sale.total_price or 0).replace(',', '.') }}</div>
     </div>
 
 </body>

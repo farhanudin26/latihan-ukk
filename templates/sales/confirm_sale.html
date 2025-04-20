@@ -5,8 +5,6 @@
 
 <p><strong>Total Harga: Rp{{ "{:,.0f}".format(total_price).replace(",", ".") }}</strong></p>
 <p><strong>Poin Saat Ini: <span id="customer_points_display">0</span></strong></p>
-
-<!-- Menambahkan informasi harga saat ini -->
 <p><strong>Harga Saat Ini: Rp<span id="current_price_display">{{ "{:,.0f}".format(total_price).replace(",", ".") }}</span></strong></p>
 
 <form method="POST">
@@ -44,13 +42,15 @@
     <div class="mb-3">
         <label>Total Bayar</label>
         <input type="number" name="total_pay" id="total_pay" class="form-control" required oninput="calculateReturn()">
-        <div class="text-danger" id="pay_warning" style="display: none;">Total bayar tidak boleh kurang dari total harga saat ini!</div>
+        <div class="text-danger" id="pay_warning" style="display: none;">
+            Total bayar tidak boleh kurang dari total harga saat ini!
+        </div>
     </div>
-    
+
     <div class="mb-3">
         <label>Kembalian</label>
         <input type="number" name="total_return" id="total_return" class="form-control" readonly required>
-    </div>    
+    </div>
 
     <input type="hidden" name="point_used" id="point_used" value="0">
 
@@ -59,7 +59,7 @@
 
 <script>
     let currentCustomerPoints = 0;
-    const totalPrice = '{{ total_price|int }}';
+    const totalPrice = parseInt('{{ total_price|int }}');
 
     function toggleCustomerFields() {
         const status = document.getElementById("customer_status").value;
@@ -76,10 +76,6 @@
             currentCustomerPoints = 0;
             document.getElementById("customer_points_display").textContent = "0";
 
-            updateCurrentPrice();
-            calculateReturn();
-
-            // Sembunyikan bagian poin jika bukan member
             pointsSection.style.display = "none";
             usePointSection.style.display = "none";
         } else {
@@ -88,37 +84,35 @@
 
             const defaultPoint = Math.floor(totalPrice * 0.1);
             pointField.value = defaultPoint;
+
             currentCustomerPoints = 0;
             document.getElementById("customer_points_display").textContent = "0";
 
-            updateCurrentPrice();
-            calculateReturn();
-
-            // Tampilkan bagian poin jika member
             pointsSection.style.display = "block";
             usePointSection.style.display = "block";
         }
+
+        updateCurrentPrice();
+        calculateReturn();
     }
 
     function checkPointsByPhone() {
         const phone = document.getElementById("no_hp").value;
-        if (phone) {
-            fetch(`/api/customer/points/${phone}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        currentCustomerPoints = data.points;
-                        document.getElementById("customer_points_display").textContent = currentCustomerPoints;
-                        updateCurrentPrice();
-                        calculateReturn();
-                    } else {
-                        alert(data.message);
-                    }
-                })
-                .catch(error => {
-                    alert("Error fetching points. Please try again.");
-                });
-        }
+        if (!phone || phone === "-") return;
+
+        fetch(`/api/customer/points/${phone}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentCustomerPoints = parseInt(data.points);
+                    document.getElementById("customer_points_display").textContent = currentCustomerPoints;
+                    updateCurrentPrice();
+                    calculateReturn();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(() => alert("Gagal mengambil poin. Coba lagi."));
     }
 
     function updateCurrentPrice() {
@@ -126,8 +120,8 @@
         let priceAfterPoints = totalPrice;
 
         if (usePoints) {
-            priceAfterPoints = totalPrice - currentCustomerPoints;
-            priceAfterPoints = priceAfterPoints < 0 ? 0 : priceAfterPoints;
+            priceAfterPoints -= currentCustomerPoints;
+            if (priceAfterPoints < 0) priceAfterPoints = 0;
         }
 
         document.getElementById("current_price_display").textContent = priceAfterPoints.toLocaleString('id-ID');
@@ -135,26 +129,23 @@
 
     function calculateReturn() {
         const usePoints = document.getElementById("use_point").checked;
-        let totalPay = parseInt(document.getElementById("total_pay").value) || 0;
-
+        const totalPay = parseInt(document.getElementById("total_pay").value) || 0;
         let priceAfterPoints = totalPrice;
+
         if (usePoints) {
             priceAfterPoints -= currentCustomerPoints;
             if (priceAfterPoints < 0) priceAfterPoints = 0;
             document.getElementById("point_used").value = currentCustomerPoints;
         } else {
             document.getElementById("point_used").value = 0;
+            document.getElementById("customer_point").value = Math.floor(totalPrice * 0.1);
         }
 
-        if (!usePoints) {
-            const pointsToAdd = Math.floor(totalPrice * 0.1);
-            document.getElementById("customer_point").value = pointsToAdd;
-        }
-
+        const warning = document.getElementById("pay_warning");
         if (totalPay < priceAfterPoints) {
-            document.getElementById("pay_warning").style.display = "block";
+            warning.style.display = "block";
         } else {
-            document.getElementById("pay_warning").style.display = "none";
+            warning.style.display = "none";
         }
 
         const totalReturn = totalPay - priceAfterPoints;
@@ -162,16 +153,13 @@
     }
 
     function setDefaultPoints() {
-        const pointField = document.getElementById("customer_point");
-        const defaultPoint = Math.floor(totalPrice * 0.1);
-        pointField.value = defaultPoint;
+        document.getElementById("customer_point").value = Math.floor(totalPrice * 0.1);
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", () => {
         setDefaultPoints();
         calculateReturn();
         toggleCustomerFields();
-        document.getElementById("customer_points_display").textContent = "0";
     });
 </script>
 {% endblock %}

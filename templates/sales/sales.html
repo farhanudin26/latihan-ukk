@@ -38,10 +38,7 @@
                     <a href="{{ url_for('api_bp.export_sales_excel') }}" class="btn btn-success me-2" 
                     {% if current_user.role == 'admin' %} style="display: none;" {% endif %}>
                      <i class="fas fa-file-excel"></i> Export Excel
-                 </a>                 
-                    <a href="{{ url_for('api_bp.export_all_sales_pdf') }}" class="btn btn-danger">
-                        <i class="fas fa-file-pdf"></i> Export Semua PDF
-                    </a>                    
+                 </a>                                   
                 </div>
             </div>
 

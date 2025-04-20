@@ -40,6 +40,7 @@
                 <table class="table table-bordered table-striped table-hover align-middle">
                     <thead class="table-dark">
                         <tr>
+                            <th>No</th> <!-- Kolom tambahan -->
                             <th>Nama Produk</th>
                             <th>Harga</th>
                             <th>Stok</th>
@@ -52,6 +53,7 @@
                     <tbody>
                         {% for product in products %}
                         <tr>
+                            <td>{{ loop.index }}</td> <!-- Nomor urutan -->
                             <td>{{ product.name }}</td>
                             <td>Rp{{ "{:,.0f}".format(product.price) }}</td>
                             <td>{{ product.stock }}</td>
@@ -70,7 +72,6 @@
                                 <a href="{{ url_for('api_bp.update_product_stock', id=product.id) }}" class="btn btn-sm btn-info text-white">
                                     <i class="fas fa-boxes"></i> Stok
                                 </a>
-                                <!-- Form untuk hapus produk -->
                                 <form action="{{ url_for('api_bp.delete_product', id=product.id) }}" method="POST" style="display:inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Yakin ingin menghapus produk ini?')">
                                         <i class="fas fa-trash-alt"></i> Hapus

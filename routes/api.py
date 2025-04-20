@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 import io
 import os
@@ -17,17 +17,59 @@ bcrypt = Bcrypt()
 
 api_bp = Blueprint("api_bp", __name__)
 
+#################### dashboard ######################
+@api_bp.route('/pie_chart_data')
+@login_required
+def pie_chart_data():
+    sales_data = (
+        db.session.query(
+            Product.name,
+            db.func.sum(DetailSale.amount).label('total_sold')
+        )
+        .join(DetailSale)
+        .group_by(Product.id)
+        .all()
+    )
 
-@api_bp.route("/api/sales_per_day")
-def get_sales_per_day():
-    sales_per_day = db.session.query(
-        func.date(Sale.created_at).label('sale_day'),
-        func.sum(Sale.total_price).label('total_sales')
-    ).group_by(func.date(Sale.created_at)).all()
+    data = [
+        {
+            'name': product_name,
+            'sales': int(total_sold or 0)
+        }
+        for product_name, total_sold in sales_data
+    ]
 
-    result = [{'sale_day': str(sale[0]), 'total_sales': sale[1]} for sale in sales_per_day]
+    return jsonify(data)
 
-    return jsonify(result)
+@api_bp.route('/bar_chart_data')
+@login_required
+def bar_chart_data():
+    sales_data = (
+        db.session.query(
+            db.func.date(Sale.sale_date).label('sale_date'),
+            db.func.sum(DetailSale.amount).label('total_sold')
+        )
+        .join(DetailSale, DetailSale.sale_id == Sale.id)
+        .group_by(db.func.date(Sale.sale_date))
+        .order_by(db.func.date(Sale.sale_date))
+        .all()
+    )
+
+    data = [
+        {
+            'date': sale_date.strftime('%Y-%m-%d'),
+            'total_stock_sold': int(total_sold or 0)
+        }
+        for sale_date, total_sold in sales_data
+    ]
+
+    return jsonify(data)
+
+@api_bp.route('/api/sales_today')
+def sales_today():
+    today = date.today()
+    sales = db.session.query(func.sum(DetailSale.amount)).join(Sale).filter(Sale.sale_date >= today).scalar() or 0
+    return jsonify({'total_sold': sales})
 
 #################### user ######################
 
@@ -324,8 +366,8 @@ def confirm_sale():
         customer_status = request.form.get("customer_status")
         customer_name = request.form.get("customer_name")
         no_hp = request.form.get("no_hp")
-        customer_point = int(request.form.get("customer_point") or 0)
-        use_point = request.form.get("use_point")
+        customer_point_earned = int(request.form.get("customer_point") or 0)
+        point_used = int(request.form.get("point_used") or 0)
         total_pay = int(request.form.get("total_pay") or 0)
         total_return = int(request.form.get("total_return") or 0)
 
@@ -335,22 +377,22 @@ def confirm_sale():
         if is_member:
             customer = Customer.query.filter_by(no_hp=no_hp).first()
             if not customer:
-                customer = Customer(name=customer_name, no_hp=no_hp, point=customer_point)
+                customer = Customer(name=customer_name, no_hp=no_hp, point=customer_point_earned)
                 db.session.add(customer)
                 db.session.commit()
             else:
-                customer.point += customer_point
-                db.session.commit()
+                # Tambahkan poin yang didapat
+                customer.point += customer_point_earned
 
-        final_point = 0
-        if is_member and use_point and customer and customer.point > 0:
-            final_point = min(customer.point, customer_point)
-            
-            # Pastikan semua poin terpakai dan diset ke 0
-            customer.point = 0
+            # Gunakan poin jika tersedia dan diminta
+            if point_used > 0:
+                if point_used > customer.point:
+                    flash("Poin yang dimasukkan melebihi yang dimiliki.", "danger")
+                    return redirect(url_for('api_bp.confirm_sale'))
+                customer.point -= point_used
             db.session.commit()
 
-
+        # Simpan data penjualan
         sale = Sale(
             sale_date=datetime.strptime(sale_data['sale_date'], '%Y-%m-%d'),
             total_price=sale_data['total_price'],
@@ -358,12 +400,13 @@ def confirm_sale():
             total_return=total_return,
             user_id=current_user.id,
             customer_id=customer.id if customer else None,
-            point=final_point,
-            total_point=final_point
+            point=point_used,  # poin yang digunakan
+            total_point=customer_point_earned  # poin yang didapat
         )
         db.session.add(sale)
         db.session.commit()
 
+        # Detail produk
         for pid, qty in zip(sale_data['products'], sale_data['quantities']):
             product = Product.query.get(int(pid))
             qty = int(qty)
@@ -384,6 +427,7 @@ def confirm_sale():
         return redirect(url_for('api_bp.sales_invoice', sale_id=sale.id))
 
     return render_template('sales/confirm_sale.html', products=products, total_price=sale_data['total_price'])
+
 
 @api_bp.route('/customer/points/<string:phone>', methods=['GET'])
 def get_customer_points(phone):
@@ -408,55 +452,31 @@ def sales_invoice(sale_id):
     details = DetailSale.query.filter_by(sale_id=sale_id).all()
 
     return render_template('sales/sales_invoice.html', sale=sale, customer=customer, cashier=cashier, details=details,)
-
-@api_bp.route('/sales/complete', methods=['POST'])
-def complete_sale():
-    # Ambil data dari form
-    customer_phone = request.form['no_hp']
-    total_pay = float(request.form['total_pay'])
-    points_used = int(request.form['point_used'])
-
-    # Cari customer berdasarkan no_hp
-    customer = Customer.query.filter_by(no_hp=customer_phone).first()
-    
-    if customer:
-        # Verifikasi bahwa poin yang digunakan tidak melebihi poin yang dimiliki
-        if points_used > customer.point:
-            return jsonify({'success': False, 'message': 'Poin yang digunakan melebihi poin yang dimiliki'}), 400
-        
-        # Update jumlah poin customer setelah transaksi
-        customer.point -= points_used
-        db.session.commit()
-
-        # Simpan penjualan ke database
-        sale = Sale(
-            customer_id=customer.id,
-            total_price=total_pay,
-            points_used=points_used
-        )
-        db.session.add(sale)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Penjualan berhasil disimpan'})
-    else:
-        return jsonify({'success': False, 'message': 'Customer tidak ditemukan'}), 404
-    
     
 @api_bp.route('/sales/export_excel')
 def export_sales_excel():
     sales = Sale.query.all()
     data = []
+
     for sale in sales:
-        data.append({
-            "Nama Pelanggan": sale.customer.name if sale.customer else "Customer",
-            "Tanggal Penjualan": sale.sale_date.strftime('%Y-%m-%d'),
-            "Total Harga": sale.total_price,
-            "Total Bayar": sale.total_pay,
-            "Kasir": sale.user.name if sale.user else ""
-        })
+        for detail in sale.detail_sales:
+            product = detail.product
+            data.append({
+                "Nama Pelanggan": sale.customer.name if sale.customer else "Customer",
+                "No HP Customer": sale.customer.no_hp if sale.customer else "-",
+                "Point Pembeli": sale.customer.point if sale.customer else 0,
+                "Tanggal Penjualan": sale.sale_date.strftime('%Y-%m-%d'),
+                "Produk yang Dibeli": product.name if product else "-",
+                "Jumlah Dibeli": detail.amount,
+                "Subtotal": detail.subtotal,
+                "Total Harga": sale.total_price,
+                "Total Bayar": sale.total_pay,
+                "Total Kembalian": sale.total_return,
+                "Kasir": sale.user.name if sale.user else "-"
+            })
 
     df = pd.DataFrame(data)
-    
+
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Data Penjualan')
@@ -488,12 +508,3 @@ def sales_invoice_pdf(sale_id):
     response.headers['Content-Disposition'] = f'attachment; filename="invoice_{sale.id}.pdf"'
 
     return response
-
-@api_bp.route('/sales/export_all_pdf')
-def export_all_sales_pdf():
-    sales = Sale.query.all()
-    html = render_template('sales/sales_pdf.html', sales=sales)
-    pdf_file = io.BytesIO()
-    pisa.CreatePDF(io.StringIO(html), dest=pdf_file)
-    pdf_file.seek(0)
-    return send_file(pdf_file, download_name="semua_penjualan.pdf", as_attachment=True)
